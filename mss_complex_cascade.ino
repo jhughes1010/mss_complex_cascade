@@ -25,12 +25,16 @@ void setup() {
   //set i2c port expander DDR and pullups
 
   //set LCD i2c port expander
+  while (1) {
+    heartbeat(200);
+  }
 }
 
 void loop() {
   long currentTime = 0;
   static long activeTime = 0;
 
+  heartbeat(1000);
   currentTime = millis();
   //Read inputs i2C
 
