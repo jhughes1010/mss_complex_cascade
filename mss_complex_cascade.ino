@@ -21,18 +21,29 @@ enum { clear,
 
 
 void setup() {
+  bool error = true;
+  int state, mast;
   Serial.begin(9600);
   //set i2c port expander DDR and pullups
 
   //set LCD i2c port expander
-  while (1) {
+
+  //ckeck if setup failed
+  while (error) {
     heartbeat(200);
+  }
+  for (state = 3; state >= 0; state--) {
+    for (mast = 0; mast < 4; mast++) {
+      SetMast(points_upper, state);
+    }
+    delay(750);
   }
 }
 
 void loop() {
   long currentTime = 0;
   static long activeTime = 0;
+  int upper, lower, main_lamp, diverge_lamp;
 
   heartbeat(1000);
   currentTime = millis();
@@ -43,8 +54,8 @@ void loop() {
   //Process inputs
 
   //Set masts
-  SetMast(points_upper, 0);
-  SetMast(points_upper, 0);
-  SetMast(main, 0);
-  SetMast(diverge, 0);
+  SetMast(points_upper, upper);
+  SetMast(points_upper, lower);
+  SetMast(main, main_lamp);
+  SetMast(diverge, diverge_lamp);
 }
