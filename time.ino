@@ -3,10 +3,11 @@
 //OutWindow
 
 
-void heartbeat(int time) {
+bool heartbeat(int time) {
   bool status;
   status = (millis() / time) % 2;
   digitalWrite(LED_BUILTIN, status);
+  return status;
 }
 
 //Returns true if compareTime is inside the compareWindow

@@ -14,7 +14,7 @@ Adafruit_MCP23X17 mss_25;
 enum { points_upper,
        points_lower,
        main,
-       diverge };
+       dvg };
 
 enum { clear,
        adv,
@@ -45,6 +45,9 @@ void setup() {
     heartbeat(250);
   }
   LightShow();
+  SetSignal(points_lower, clear);
+
+  darkAll();
 }
 
 void loop() {
@@ -54,7 +57,7 @@ void loop() {
   static long activeTime = 0;
   int upper_lamp, lower_lamp, main_lamp, diverge_lamp;
 
-  heartbeat(2000);
+  diverge = heartbeat(2000);
   currentTime = millis();
   //Read inputs i2C
   GPIO = mss_25.readGPIOAB();
@@ -67,18 +70,23 @@ void loop() {
   PrintOnChange(diverge);
   //Serial.print("Diverge: ");
   //Serial.println(diverge);
-delay(1000);
+  //delay(1000);
   //force override lighting based on diverge
   if (diverge) {
     upper_lamp = occ;
+    lower_lamp = clear;
     main_lamp = occ;
+    diverge_lamp = clear;
+
   } else {
+    upper_lamp = clear;
     lower_lamp = occ;
+    main_lamp = clear;
     diverge_lamp = occ;
   }
   //Set masts
   SetSignal(points_upper, upper_lamp);
-  SetSignal(points_upper, lower_lamp);
+  SetSignal(points_lower, lower_lamp);
   SetSignal(main, main_lamp);
-  SetSignal(diverge, diverge_lamp);
+  SetSignal(dvg, diverge_lamp);
 }

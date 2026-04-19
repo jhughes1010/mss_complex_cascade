@@ -15,17 +15,19 @@ bool InitMastLighting(void) {
       //Serial.println(pin);
     }
   }
+  darkAll();
   return error;
 }
 
 void LightShow(void) {
   int state, signal;
-  for (state = 3; state >= 0; state--) {
+  for (state = 0; state < 4; state++) {
     Serial.print(".");
     for (signal = 0; signal < 4; signal++) {
       SetSignal(signal, state);
     }
-    delay(1500);
+    delay(1000);
+    darkAll();
   }
   Serial.println(" Start");
 }
@@ -35,9 +37,11 @@ void SetSignal(int signalHead, int status) {
   int green_bit, red_bit, yellow_bit;
   int addr;
   bool adv_blink;
-  static int priorStatus = -1;
+  static int priorStatus[4] = { -1, -1, -1, -1 };
 
-
+  //Serial.print(signalHead);
+  //Serial.print(":");
+  //Serial.println(status);
   adv_blink = (millis() / 1000) % 2;
 
   switch (signalHead) {
@@ -50,27 +54,29 @@ void SetSignal(int signalHead, int status) {
 
     case points_lower:
       addr = 0x26;
-      green_bit = 7;
-      yellow_bit = 6;
+      green_bit = 3;
+      yellow_bit = 4;
       red_bit = 5;
       break;
 
     case main:
       addr = 0x26;
-      green_bit = 7;
-      yellow_bit = 6;
-      red_bit = 5;
+      green_bit = 6;
+      yellow_bit = 7;
+      red_bit = 8;
       break;
 
-    case diverge:
+    case dvg:
       addr = 0x26;
-      green_bit = 7;
-      yellow_bit = 6;
-      red_bit = 5;
+      green_bit = 9;
+      yellow_bit = 10;
+      red_bit = 11;
       break;
   }
-  if (status != priorStatus || status == adv) {
+  if (status != priorStatus[signalHead] || status == adv) {
+    dark(signalHead);
     if (status == clear) {
+      //Serial.println("Clear");
       mast.digitalWrite(green_bit, LOW);
     } else if (status == adv) {
       if (adv_blink) {
@@ -81,10 +87,23 @@ void SetSignal(int signalHead, int status) {
     } else if (status == apr) {
       mast.digitalWrite(yellow_bit, LOW);
     } else if (status == occ) {
+      //Serial.println("Occupied");
+
       mast.digitalWrite(red_bit, LOW);
     } else {
       //dark
     }
   }
-  priorStatus = status;
+  priorStatus[signalHead] = status;
+}
+
+void darkAll(void) {
+  mast.writeGPIOAB(0xffff);
+}
+void dark(int signal) {
+  int GPIO, mask;
+  mask = 7 << (signal * 3);
+  GPIO = mast.readGPIOAB();
+  GPIO = GPIO | mask;
+  mast.writeGPIOAB(GPIO);
 }
