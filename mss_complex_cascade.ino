@@ -21,6 +21,7 @@ enum { clear,
        apr,
        occ };
 
+Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 
 
@@ -46,31 +47,41 @@ void setup() {
   }
   LightShow();
   SetSignal(points_lower, clear);
+  SetSignal(dvg, clear);
 
   darkAll();
+  //LCD
+  LCDInit();
+  delay(2000);
 }
 
 void loop() {
-  int GPIO;
-  bool diverge = false;
+  int GPIO25, GPIO27;
+  bool diverge = false, optical;
   long currentTime = 0;
   static long activeTime = 0;
   int upper_lamp, lower_lamp, main_lamp, diverge_lamp;
 
-  diverge = heartbeat(2000);
+  /*while(1){
+    Serial.println(".");
+  }*/
+
   currentTime = millis();
   //Read inputs i2C
-  GPIO = mss_25.readGPIOAB();
-  diverge = !(GPIO & 0x8000);
+  GPIO25 = mss_25.readGPIOAB();
+  diverge = !(GPIO25 & 0x8000);
+  //GPIO27 = 0xffff - mss_27.readGPIOAB();
 
   //Read inputs optical
-  //optical = readOptical(A0, currentTime);
+  //activeTime = currentTime;
+  optical = readOptical(0x50, currentTime, activeTime);
 
   //Process inputs
+  //diverge = heartbeat(2000);
   PrintOnChange(diverge);
-  //Serial.print("Diverge: ");
-  //Serial.println(diverge);
-  //delay(1000);
+  LCDStatus(diverge);
+  LCDSigStatus();
+
   //force override lighting based on diverge
   if (diverge) {
     upper_lamp = occ;

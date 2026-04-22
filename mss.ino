@@ -9,8 +9,8 @@ bool InitMSS27(void) {
   } else {
     //setPIN direction
     for (pin = 0; pin < 16; pin++) {
-      mss_27.pinMode(pin, INPUT);
-      Serial.print("Input pin:");
+      mss_27.pinMode(pin, INPUT_PULLUP);
+      //Serial.print("Input pin:");
       Serial.println(pin);
     }
   }
@@ -32,12 +32,12 @@ bool InitMSS25(void) {
     for (pin = 0; pin < 16; pin++) {
       if (pin < 15) {
         mss_25.pinMode(pin, OUTPUT);
-        Serial.print("Output pin:");
-        Serial.println(pin);
+        //Serial.print("Output pin:");
+        //Serial.println(pin);
       } else {
         mss_25.pinMode(pin, INPUT_PULLUP);
-        Serial.print("Input pin:");
-        Serial.println(pin);
+        //Serial.print("Input pin:");
+        //Serial.println(pin);
       }
     }
   }
