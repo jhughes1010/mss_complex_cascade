@@ -37,6 +37,7 @@ void setup() {
 
   Serial.begin(9600);
   Serial.println("MSS Complex Cascade");
+  Serial.println("Version 2026-08-10");
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BD_POINTS, INPUT_PULLUP);
   pinMode(BD_MAIN, INPUT_PULLUP);
