@@ -96,8 +96,8 @@ void loop() {
     dark = false;
   }
   if (timeWindowOut(currentTime,activeTime,180000)){
-    dark=true;
-    Serial.println("dark");
+    //dark=true;
+    //Serial.println("dark");
 
   }
 
