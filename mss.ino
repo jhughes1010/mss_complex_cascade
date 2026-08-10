@@ -10,12 +10,15 @@ bool InitMSS27(void) {
     //setPIN direction
     for (pin = 0; pin < 16; pin++) {
       mss_27.pinMode(pin, INPUT_PULLUP);
-      //Serial.print("Input pin:");
-      Serial.println(pin);
+      if (debug) {
+        Serial.print("Input pin:");
+        Serial.println(pin);
+      }
     }
   }
   return error;
 }
+
 
 
 bool InitMSS25(void) {
@@ -30,16 +33,21 @@ bool InitMSS25(void) {
     //setPIN direction
     //This might be done with one register write??
     for (pin = 0; pin < 16; pin++) {
-      if (pin < 15) {
+      if (pin < 12) {
         mss_25.pinMode(pin, OUTPUT);
-        //Serial.print("Output pin:");
-        //Serial.println(pin);
+        if (debug) {
+          Serial.print("Output pin:");
+          Serial.println(pin);
+        }
       } else {
         mss_25.pinMode(pin, INPUT_PULLUP);
-        //Serial.print("Input pin:");
-        //Serial.println(pin);
+        if (debug) {
+          Serial.print("Input pin:");
+          Serial.println(pin);
+        }
       }
     }
   }
+  mss_25.writeGPIOAB(0x0000);
   return error;
 }

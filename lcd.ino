@@ -14,7 +14,6 @@ void LCDStatus(bool diverge) {
       lcd.setCursor(15, 1);
       lcd.print("D");
     }
-    Serial.println(diverge);
   }
   divergePrior = diverge;
 }
@@ -29,18 +28,26 @@ void LCDSigStatus(void) {
   }
   if (mode != modePrior) {
     switch (mode) {
-      case 1:
+      case 0:
         lcd.clear();
         lcd.setBacklight(0x07);
         lcd.setCursor(0, 0);
         lcd.print("Points U/L");
         break;
 
-      case 2:
+        break;
+      case 1:
         lcd.clear();
         lcd.setBacklight(0x06);
         lcd.setCursor(0, 0);
         lcd.print("Main");
+        break;
+
+      case 2:
+        lcd.clear();
+        lcd.setBacklight(0x05);
+        lcd.setCursor(0, 0);
+        lcd.print("Diverge");
         break;
     }
   }
