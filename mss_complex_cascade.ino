@@ -1,6 +1,6 @@
-//MSS complex cascade
-//James Hughes
-//09-17-26
+// MSS complex cascade
+// James Hughes
+// Phase 1 MSS I/O recode - 2026-10-17
 
 #include <Wire.h>
 #include <Adafruit_MCP23X17.h>
@@ -10,12 +10,14 @@ Adafruit_MCP23X17 mast;
 Adafruit_MCP23X17 mss_27;
 Adafruit_MCP23X17 mss_25;
 
-#define debug 0
+// Hardware is present on the PCB, but these detector systems are not
+// physically installed and are intentionally excluded from Phase 1 logic.
+#define ENABLE_LOCAL_BLOCK_DETECTORS 0
+#define ENABLE_OPTICAL_DETECTORS     0
 
-#define BD_POINTS 2
-#define BD_MAIN 3
+#define BD_POINTS  2
+#define BD_MAIN    3
 #define BD_DIVERGE 4
-
 
 enum { points_upper,
        points_lower,
@@ -27,119 +29,85 @@ enum { clear,
        apr,
        occ };
 
+// Indices into the Phase 1 MSS input table in mss.ino.
+enum MSSInputIndex {
+  MSS_P_OCC_IN,
+  MSS_P_APR_IN,
+  MSS_P_ADV_IN,
+  MSS_M_OCC_IN,
+  MSS_M_APR_IN,
+  MSS_M_ADV_IN,
+  MSS_D_OCC_IN,
+  MSS_D_APR_IN,
+  MSS_D_ADV_IN
+};
+
+// Indices into the MSS output table in mss.ino.
+enum MSSOutputIndex {
+  MSS_P_OCC,
+  MSS_P_APR_OUT,
+  MSS_P_ADV_OUT,
+  MSS_P_DIVERGE,
+  MSS_M_OCC,
+  MSS_M_APR_OUT,
+  MSS_M_ADV_OUT,
+  MSS_M_DIVERGE,
+  MSS_D_OCC,
+  MSS_D_APR_OUT,
+  MSS_D_ADV_OUT,
+  MSS_D_DIVERGE
+};
+
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
-
-
 
 void setup() {
   bool error = false;
-  int state, head;
 
   Serial.begin(9600);
-  Serial.println("MSS Complex Cascade");
-  Serial.println("Version 2026-08-10");
+  Serial.println(F("MSS Complex Cascade Controller"));
+  Serial.println(F("Phase 1 MSS I/O - 2026-10-17"));
+
   pinMode(LED_BUILTIN, OUTPUT);
+
+#if ENABLE_LOCAL_BLOCK_DETECTORS
   pinMode(BD_POINTS, INPUT_PULLUP);
   pinMode(BD_MAIN, INPUT_PULLUP);
   pinMode(BD_DIVERGE, INPUT_PULLUP);
+#endif
 
-  //delay(2000);
-  //Serial.println("Intentional 5s delay complete");
-
-  //set i2c port expander DDR and pullups
   error = InitMastLighting();
   error |= InitMSS27();
   error |= InitMSS25();
 
-  //set LCD i2c port expander
   LCDInit();
-  delay(2000);
 
-  //ckeck if setup failed
   while (error) {
     heartbeat(250);
   }
-  LightShow();
+
+  // Establish the current MSS state without generating fake startup changes.
+  InitMSSState();
+
+  Serial.println(F("MSS I/O initialized"));
+  Serial.println(F("-------------------"));
+
+  // Keep the existing mast hardware initialization for now. Cascade behavior
+  // will be connected to the MSS state machine in the next phase.
   SetSignal(points_lower, clear);
   SetSignal(dvg, clear);
-
   darkAll();
 }
 
 void loop() {
-  int GPIO25, GPIO27;
-  bool diverge = false, optical;
-  bool bd_points, bd_main, bd_diverge;
-  static bool dark = false, opticalActive = false;
-  long currentTime = 0;
-  static long activeTime = 0, activeTimeOptical = 0;
-  int upper_lamp, lower_lamp, main_lamp, diverge_lamp;
-
-  currentTime = millis();
   heartbeat(2000);
 
+  // Phase 1: watch the nine external MSS status inputs (OCC, APR-IN, ADV-IN
+  // for Points/Main/Diverge). Serial output occurs only on a state change.
+  UpdateMSSInputs();
 
-  //Read Block detect local
-  bd_points = !digitalRead(BD_POINTS);
-  bd_main = !digitalRead(BD_MAIN);
-  bd_diverge = !digitalRead(BD_DIVERGE);
-  //Read inputs i2C
-  GPIO25 = mss_25.readGPIOAB();
-  diverge = !(GPIO25 & 0x4000);
-  GPIO27 = 0xffff - mss_27.readGPIOAB();
-  //Serial.println(GPIO27, HEX);
+  // No local block detector or optical detector processing yet.
+  // No cascade output logic is applied yet. All MSS outputs remain clear
+  // unless future state-machine code calls SetMSSOutput().
 
-  //Read inputs optical
-
-  //update active time if needed
-  if (GPIO27 | bd_points | bd_main | bd_diverge) {
-    activeTime = currentTime;
-    dark = false;
-  }
-  if (timeWindowOut(currentTime,activeTime,180000)){
-    //dark=true;
-    //Serial.println("dark");
-
-  }
-
-  optical = readOptical(0x50, currentTime, activeTime);
-  PrintOnChangeBDLocal(bd_points, bd_main, bd_diverge);
-  PrintOnChangeDiverge(diverge);
-
-  //Process inputs
-  LCDStatus(diverge);
   LCDSigStatus();
-
-  //force override lighting based on diverge
-  if (diverge) {
-    upper_lamp = occ;
-    lower_lamp = clear;
-    main_lamp = occ;
-    diverge_lamp = clear;
-
-  } else {
-    upper_lamp = clear;
-    lower_lamp = occ;
-    main_lamp = clear;
-    diverge_lamp = occ;
-  }
-  //Set masts
-  if (!dark) {
-    SetSignal(points_upper, upper_lamp);
-    SetSignal(points_lower, lower_lamp);
-    SetSignal(main, main_lamp);
-    SetSignal(dvg, diverge_lamp);
-  } else {
-    darkAll();
-  }
-
-  //testing 25 drive
-  /*  int gpioreg = 0x0001;
-  int x;
-
-  for (x = 0; x < 12; x++) {
-    delay(500);
-    mss_25.writeGPIOAB(gpioreg);
-    gpioreg = gpioreg << 1;
-  }*/
 }
