@@ -10,15 +10,15 @@
 // HIGH at U4 asserts the corresponding MSS status line LOW.
 
 struct MSSInputDef {
-  const __FlashStringHelper *section;
-  const __FlashStringHelper *function;
+  const char *section;
+  const char *function;
   uint8_t pin;
   bool state;
 };
 
 struct MSSOutputDef {
-  const __FlashStringHelper *section;
-  const __FlashStringHelper *function;
+  const char *section;
+  const char *function;
   uint8_t pin;
   bool state;
 };
@@ -26,15 +26,15 @@ struct MSSOutputDef {
 // U5 / 0x27. All MSS status inputs are active LOW.
 // U3/U6 CD4050 outputs land on U5 as A0..A7 and B0.
 MSSInputDef mssInputs[] = {
-  { F("POINTS"),  F("OCC"),     0, false },
-  { F("POINTS"),  F("APR-IN"),  1, false },
-  { F("POINTS"),  F("ADV-IN"),  2, false },
-  { F("MAIN"),    F("OCC"),     3, false },
-  { F("MAIN"),    F("APR-IN"),  4, false },
-  { F("MAIN"),    F("ADV-IN"),  5, false },
-  { F("DIVERGE"), F("OCC"),     6, false },
-  { F("DIVERGE"), F("APR-IN"),  7, false },
-  { F("DIVERGE"), F("ADV-IN"),  8, false }
+  { "POINTS",  "OCC",     0, false },
+  { "POINTS",  "APR-IN",  1, false },
+  { "POINTS",  "ADV-IN",  2, false },
+  { "MAIN",    "OCC",     3, false },
+  { "MAIN",    "APR-IN",  4, false },
+  { "MAIN",    "ADV-IN",  5, false },
+  { "DIVERGE", "OCC",     6, false },
+  { "DIVERGE", "APR-IN",  7, false },
+  { "DIVERGE", "ADV-IN",  8, false }
 };
 
 const uint8_t MSS_INPUT_COUNT = sizeof(mssInputs) / sizeof(mssInputs[0]);
@@ -42,21 +42,32 @@ const uint8_t MSS_INPUT_COUNT = sizeof(mssInputs) / sizeof(mssInputs[0]);
 // U4 / 0x25 assertion drivers.
 // A logical true means ASSERTED at the MSS interface (status line pulled LOW).
 MSSOutputDef mssOutputs[] = {
-  { F("POINTS"),  F("OCC"),      0, false },
-  { F("POINTS"),  F("APR-OUT"),  1, false },
-  { F("POINTS"),  F("ADV-OUT"),  2, false },
-  { F("POINTS"),  F("DIVERGE"),  3, false },
-  { F("MAIN"),    F("OCC"),      4, false },
-  { F("MAIN"),    F("APR-OUT"),  5, false },
-  { F("MAIN"),    F("ADV-OUT"),  6, false },
-  { F("MAIN"),    F("DIVERGE"),  7, false },
-  { F("DIVERGE"), F("OCC"),      8, false },
-  { F("DIVERGE"), F("APR-OUT"),  9, false },
-  { F("DIVERGE"), F("ADV-OUT"), 10, false },
-  { F("DIVERGE"), F("DIVERGE"), 11, false }
+  { "POINTS",  "OCC",      0, false },
+  { "POINTS",  "APR-OUT",  1, false },
+  { "POINTS",  "ADV-OUT",  2, false },
+  { "POINTS",  "DIVERGE",  3, false },
+  { "MAIN",    "OCC",      4, false },
+  { "MAIN",    "APR-OUT",  5, false },
+  { "MAIN",    "ADV-OUT",  6, false },
+  { "MAIN",    "DIVERGE",  7, false },
+  { "DIVERGE", "OCC",      8, false },
+  { "DIVERGE", "APR-OUT",  9, false },
+  { "DIVERGE", "ADV-OUT", 10, false },
+  { "DIVERGE", "DIVERGE", 11, false }
 };
 
 const uint8_t MSS_OUTPUT_COUNT = sizeof(mssOutputs) / sizeof(mssOutputs[0]);
+
+uint16_t lastMSS27Raw = 0xFFFF;
+
+void PrintRawGPIO(const __FlashStringHelper *label, uint16_t value) {
+  Serial.print(label);
+  Serial.print(F("0x"));
+  if (value < 0x1000) Serial.print('0');
+  if (value < 0x0100) Serial.print('0');
+  if (value < 0x0010) Serial.print('0');
+  Serial.println(value, HEX);
+}
 
 bool InitMSS27(void) {
   bool error = false;
@@ -97,6 +108,9 @@ bool InitMSS25(void) {
 void InitMSSState(void) {
   // Capture initial states silently. Startup is not an MSS transition.
   uint16_t raw = mss_27.readGPIOAB();
+  lastMSS27Raw = raw;
+  PrintRawGPIO(F("MSS IN   RAW 0x27: "), raw);
+
   for (uint8_t i = 0; i < MSS_INPUT_COUNT; i++) {
     mssInputs[i].state = ((raw & (1U << mssInputs[i].pin)) == 0);
   }
@@ -107,8 +121,8 @@ void InitMSSState(void) {
 }
 
 void PrintMSSChange(const __FlashStringHelper *direction,
-                    const __FlashStringHelper *section,
-                    const __FlashStringHelper *function,
+                    const char *section,
+                    const char *function,
                     bool asserted) {
   Serial.print(F("MSS "));
   Serial.print(direction);
@@ -122,6 +136,13 @@ void PrintMSSChange(const __FlashStringHelper *direction,
 
 void UpdateMSSInputs(void) {
   uint16_t raw = mss_27.readGPIOAB();
+
+  // Low-level troubleshooting: print the complete MCP23017 GPIO word only
+  // when any input changes. This is the uninverted electrical value.
+  if (raw != lastMSS27Raw) {
+    PrintRawGPIO(F("MSS IN   RAW 0x27: "), raw);
+    lastMSS27Raw = raw;
+  }
 
   for (uint8_t i = 0; i < MSS_INPUT_COUNT; i++) {
     // Every MSS status input is active LOW.
