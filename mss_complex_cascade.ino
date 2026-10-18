@@ -36,33 +36,48 @@ void setup() {
   error|=InitMSS25();
   LCDInit();
   while(error) heartbeat(250);
-  InitMSSTrafficMonitor();
 }
 
 void loop() {
   heartbeat(2000);
   uint16_t gpio27=mss_27.readGPIOAB();
   uint16_t gpio25=mss_25.readGPIOAB();
-  ReportMSSTraffic(gpio27,gpio25);       // only serial traffic during run
-
   bool diverge=MSSActive(gpio25,DIVERGE_INPUT_BIT);
+
+  // Independently propagate MSS restrictions through the selected route.
+  UpdateCascadeOutputs(gpio27, diverge);
+
+  int pointsUpperStatus;
+  int pointsLowerStatus;
+  int mainStatus;
+  int divergeStatus;
+
   // MAIN alignment logic currently defined:
   //   P-UPPER protects MAIN, so it reflects MAIN-side MSS status.
   //   MAIN mast protects POINTS, so it reflects POINTS-side MSS status.
   //   P-LOWER and DIVERGE mast are RED.
   // Diverging alignment is intentionally fail-safe RED until defined.
   if(diverge) {
-    SetSignal(points_upper,occ);
-    SetSignal(points_lower,occ);
-    SetSignal(main,occ);
-    SetSignal(dvg,occ);
+    pointsUpperStatus=occ;
+    pointsLowerStatus=occ;
+    mainStatus=occ;
+    divergeStatus=occ;
   } else {
-    int pointsUpperStatus=DecodeMSSAspect(gpio27,M_OCC_IN,M_APR_IN,M_ADV_IN);
-    int mainStatus=DecodeMSSAspect(gpio27,P_OCC_IN,P_APR_IN,P_ADV_IN);
-
-    SetSignal(points_upper,pointsUpperStatus);
-    SetSignal(points_lower,occ);
-    SetSignal(main,mainStatus);
-    SetSignal(dvg,occ);
+    pointsUpperStatus=DecodeMSSAspect(gpio27,M_OCC_IN,M_APR_IN,M_ADV_IN);
+    pointsLowerStatus=occ;
+    mainStatus=DecodeMSSAspect(gpio27,P_OCC_IN,P_APR_IN,P_ADV_IN);
+    divergeStatus=occ;
   }
+
+  SetSignal(points_upper,pointsUpperStatus);
+  SetSignal(points_lower,pointsLowerStatus);
+  SetSignal(main,mainStatus);
+  SetSignal(dvg,divergeStatus);
+
+  // Read U4 again after cascade outputs have been written so the screen
+  // reports the actual current output state.
+  gpio25=mss_25.readGPIOAB();
+  PrintDebugScreen(gpio27,gpio25,diverge,
+                   pointsUpperStatus,pointsLowerStatus,
+                   mainStatus,divergeStatus);
 }
