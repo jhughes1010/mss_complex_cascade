@@ -51,6 +51,24 @@ bool InitMSS25(void) {
   mss_25.writeGPIOAB(0x0000);
   return error;
 }
+// ---------- MSS cascade output routing ----------
+// U4 / 0x25 driver bits. A HIGH on a -DR output turns on the
+// transistor and asserts the corresponding external MSS line LOW.
+enum MSS25OutputBit {
+  P_OCC_OUT = 0,
+  P_APR_OUT = 1,
+  P_ADV_OUT = 2,
+  P_DIVERGE_OUT = 3,
+  M_OCC_OUT = 4,
+  M_APR_OUT = 5,
+  M_ADV_OUT = 6,
+  M_DIVERGE_OUT = 7,
+  D_OCC_OUT = 8,
+  D_APR_OUT = 9,
+  D_ADV_OUT = 10,
+  D_DIVERGE_OUT = 11
+};
+
 // ---------- MSS decode / compact status screen ----------
 bool MSSActive(uint16_t gpio, uint8_t bit) {
   return (gpio & (1U << bit)) == 0;
@@ -92,13 +110,15 @@ void PrintLogic(bool asserted) {
   Serial.print(asserted ? '1' : '0');
 }
 
-void PrintDebugScreen(uint16_t gpio27, uint16_t gpio25, bool diverge,
+void PrintDebugScreen(uint16_t gpio27, uint16_t logical27, uint16_t gpio25, bool diverge,
+                      bool localMainOcc,
                       int pointsUpperStatus, int pointsLowerStatus,
                       int mainStatus, int divergeStatus) {
   static bool initialized = false;
   static uint16_t old27 = 0;
   static uint16_t old25 = 0;
   static bool oldDiverge = false;
+  static bool oldLocalMainOcc = false;
   static int oldPU = -1, oldPL = -1, oldM = -1, oldD = -1;
 
   // Ignore unused 0x25 input bits when deciding whether to redraw.
@@ -110,6 +130,7 @@ void PrintDebugScreen(uint16_t gpio27, uint16_t gpio25, bool diverge,
                  gpio27 != old27 ||
                  gpio25Relevant != old25Relevant ||
                  diverge != oldDiverge ||
+                 localMainOcc != oldLocalMainOcc ||
                  pointsUpperStatus != oldPU ||
                  pointsLowerStatus != oldPL ||
                  mainStatus != oldM ||
@@ -121,20 +142,23 @@ void PrintDebugScreen(uint16_t gpio27, uint16_t gpio25, bool diverge,
   old27 = gpio27;
   old25 = gpio25;
   oldDiverge = diverge;
+  oldLocalMainOcc = localMainOcc;
   oldPU = pointsUpperStatus;
   oldPL = pointsLowerStatus;
   oldM = mainStatus;
   oldD = divergeStatus;
 
-  const bool pOcc = MSSActive(gpio27, P_OCC_IN);
-  const bool pApr = MSSActive(gpio27, P_APR_IN);
-  const bool pAdv = MSSActive(gpio27, P_ADV_IN);
-  const bool mOcc = MSSActive(gpio27, M_OCC_IN);
-  const bool mApr = MSSActive(gpio27, M_APR_IN);
-  const bool mAdv = MSSActive(gpio27, M_ADV_IN);
-  const bool dOcc = MSSActive(gpio27, D_OCC_IN);
-  const bool dApr = MSSActive(gpio27, D_APR_IN);
-  const bool dAdv = MSSActive(gpio27, D_ADV_IN);
+  // Display the effective logical inputs used by the controller.
+  // MAIN OCC therefore includes the local block detector OR.
+  const bool pOcc = MSSActive(logical27, P_OCC_IN);
+  const bool pApr = MSSActive(logical27, P_APR_IN);
+  const bool pAdv = MSSActive(logical27, P_ADV_IN);
+  const bool mOcc = MSSActive(logical27, M_OCC_IN);
+  const bool mApr = MSSActive(logical27, M_APR_IN);
+  const bool mAdv = MSSActive(logical27, M_ADV_IN);
+  const bool dOcc = MSSActive(logical27, D_OCC_IN);
+  const bool dApr = MSSActive(logical27, D_APR_IN);
+  const bool dAdv = MSSActive(logical27, D_ADV_IN);
 
   // U4 driver outputs are active HIGH internally.
   const bool pAprOut = (gpio25 & (1U << P_APR_OUT)) != 0;
@@ -157,6 +181,7 @@ void PrintDebugScreen(uint16_t gpio27, uint16_t gpio25, bool diverge,
   Serial.print(F("OCC             ")); PrintLogic(pOcc); Serial.print(F("       ")); PrintLogic(mOcc); Serial.print(F("       ")); PrintLogic(dOcc); Serial.println();
   Serial.print(F("APR-IN          ")); PrintLogic(pApr); Serial.print(F("       ")); PrintLogic(mApr); Serial.print(F("       ")); PrintLogic(dApr); Serial.println();
   Serial.print(F("ADV-IN          ")); PrintLogic(pAdv); Serial.print(F("       ")); PrintLogic(mAdv); Serial.print(F("       ")); PrintLogic(dAdv); Serial.println();
+  Serial.print(F("LOCAL DET       -       ")); PrintLogic(localMainOcc); Serial.println(F("       -"));
   Serial.println();
 
   Serial.println(F("MASTS"));
@@ -177,24 +202,6 @@ void PrintDebugScreen(uint16_t gpio27, uint16_t gpio25, bool diverge,
   Serial.print(F("OUT 0x25: 0x")); PrintHex16(gpio25); Serial.println();
   Serial.println(F("=========================="));
 }
-
-// ---------- MSS cascade output routing ----------
-// U4 / 0x25 driver bits. A HIGH on a -DR output turns on the
-// transistor and asserts the corresponding external MSS line LOW.
-enum MSS25OutputBit {
-  P_OCC_OUT = 0,
-  P_APR_OUT = 1,
-  P_ADV_OUT = 2,
-  P_DIVERGE_OUT = 3,
-  M_OCC_OUT = 4,
-  M_APR_OUT = 5,
-  M_ADV_OUT = 6,
-  M_DIVERGE_OUT = 7,
-  D_OCC_OUT = 8,
-  D_APR_OUT = 9,
-  D_ADV_OUT = 10,
-  D_DIVERGE_OUT = 11
-};
 
 void SetMSSDriver(uint8_t bit, bool asserted) {
   // Driver is active HIGH internally; transistor makes MSS bus active LOW.

@@ -42,30 +42,42 @@ void loop() {
   heartbeat(2000);
   uint16_t gpio27=mss_27.readGPIOAB();
   uint16_t gpio25=mss_25.readGPIOAB();
+
+  // Local MAIN block detector is active LOW. OR it into the logical
+  // MAIN OCC state so all mast and cascade logic treats local detection
+  // exactly like an MSS MAIN OCC assertion. Keep gpio27 unchanged so the
+  // RAW debug value remains the actual MSS bus input.
+  const bool localMainOcc = (digitalRead(BD_MAIN) == LOW);
+  uint16_t logical27 = gpio27;
+  if (localMainOcc) logical27 &= ~(1U << M_OCC_IN);
   bool diverge=MSSActive(gpio25,DIVERGE_INPUT_BIT);
 
+  // TEMP HARDWARE WORKAROUND:
+  // DIVERGE signal polarity is inverted on the current PCB.
+  // REMOVE this inversion after the solder repair.
+  diverge = !diverge;
+
   // Independently propagate MSS restrictions through the selected route.
-  UpdateCascadeOutputs(gpio27, diverge);
+  UpdateCascadeOutputs(logical27, diverge);
 
   int pointsUpperStatus;
   int pointsLowerStatus;
   int mainStatus;
   int divergeStatus;
 
-  // MAIN alignment logic currently defined:
-  //   P-UPPER protects MAIN, so it reflects MAIN-side MSS status.
-  //   MAIN mast protects POINTS, so it reflects POINTS-side MSS status.
-  //   P-LOWER and DIVERGE mast are RED.
-  // Diverging alignment is intentionally fail-safe RED until defined.
+  // Route-dependent local mast logic.
+  // MAIN selected:    P-UPPER <-> MAIN
+  // DIVERGE selected: P-LOWER <-> DIVERGE
+  // Heads not belonging to the selected route are held RED.
   if(diverge) {
     pointsUpperStatus=occ;
-    pointsLowerStatus=occ;
+    pointsLowerStatus=DecodeMSSAspect(logical27,D_OCC_IN,D_APR_IN,D_ADV_IN);
     mainStatus=occ;
-    divergeStatus=occ;
+    divergeStatus=DecodeMSSAspect(logical27,P_OCC_IN,P_APR_IN,P_ADV_IN);
   } else {
-    pointsUpperStatus=DecodeMSSAspect(gpio27,M_OCC_IN,M_APR_IN,M_ADV_IN);
+    pointsUpperStatus=DecodeMSSAspect(logical27,M_OCC_IN,M_APR_IN,M_ADV_IN);
     pointsLowerStatus=occ;
-    mainStatus=DecodeMSSAspect(gpio27,P_OCC_IN,P_APR_IN,P_ADV_IN);
+    mainStatus=DecodeMSSAspect(logical27,P_OCC_IN,P_APR_IN,P_ADV_IN);
     divergeStatus=occ;
   }
 
@@ -77,7 +89,7 @@ void loop() {
   // Read U4 again after cascade outputs have been written so the screen
   // reports the actual current output state.
   gpio25=mss_25.readGPIOAB();
-  PrintDebugScreen(gpio27,gpio25,diverge,
+  PrintDebugScreen(gpio27,logical27,gpio25,diverge,localMainOcc,
                    pointsUpperStatus,pointsLowerStatus,
                    mainStatus,divergeStatus);
 }
